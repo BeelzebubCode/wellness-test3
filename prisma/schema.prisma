@@ -1,0 +1,200 @@
+// ==========================================
+// 📌 Prisma Schema - NU Wellness Booking System
+// ==========================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// 👤 User Model (LINE Users)
+// ==========================================
+model User {
+  id         String   @id @default(cuid())
+  lineId     String   @unique @map("line_id")
+  name       String
+  pictureUrl String?  @map("picture_url")
+  studentId  String?  @map("student_id")
+  faculty    String?
+  phone      String?
+  email      String?
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  bookings Booking[]
+
+  @@map("users")
+}
+
+// ==========================================
+// 👨‍⚕️ Consultant Model
+// ==========================================
+model Consultant {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?  @unique
+  phone     String?
+  avatar    String?
+  specialty String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  bookings Booking[]
+  admin    Admin?
+
+  @@map("consultants")
+}
+
+// ==========================================
+// 🔐 Admin Model
+// ==========================================
+model Admin {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         String   @default("consultant") // 'admin' | 'consultant'
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  consultantId String?     @unique @map("consultant_id")
+  consultant   Consultant? @relation(fields: [consultantId], references: [id])
+
+  @@map("admins")
+}
+
+// ==========================================
+// 📅 Booking Model
+// ==========================================
+model Booking {
+  id                 String    @id @default(cuid())
+  lineUserId         String?
+  userName           String?
+  date               DateTime  @db.Date
+  startTime          String    @map("start_time") // "08:00"
+  endTime            String    @map("end_time") // "09:00"
+  status             String    @default("CONFIRMED") // CONFIRMED | ASSIGNED | COMPLETED | CANCELLED
+  problemType        String?   @map("problem_type")
+  problemDescription String?   @db.Text @map("problem_description")
+  consultantNote     String?   @db.Text @map("consultant_note")
+  cancelReason       String?   @map("cancel_reason")
+  completedAt        DateTime? @map("completed_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  userId       String      @map("user_id")
+  user         User        @relation(fields: [userId], references: [id])
+  consultantId String?     @map("consultant_id")
+  consultant   Consultant? @relation(fields: [consultantId], references: [id])
+
+  @@index([date])
+  @@index([status])
+  @@index([userId])
+  @@map("bookings")
+}
+
+// ==========================================
+// ⏰ Working Hours Model (Default Schedule)
+// ==========================================
+model WorkingHours {
+  id           String   @id @default(cuid())
+  dayOfWeek    Int      @map("day_of_week") // 0 = Sunday, 1 = Monday, ...
+  openTime     String   @map("open_time") // "08:00"
+  closeTime    String   @map("close_time") // "20:00"
+  slotDuration Int      @default(60) @map("slot_duration") // minutes
+  maxBookings  Int      @default(1) @map("max_bookings")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([dayOfWeek])
+  @@map("working_hours")
+}
+
+// ==========================================
+// 📆 Day Override Model (Special Days)
+// ==========================================
+model DayOverride {
+  id          String   @id @default(cuid())
+  date        DateTime @unique @db.Date
+  isClosed    Boolean  @default(false) @map("is_closed")
+  openTime    String?  @map("open_time")
+  closeTime   String?  @map("close_time")
+  maxBookings Int?     @map("max_bookings")
+  reason      String?
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([date])
+  @@map("day_overrides")
+}
+
+// ==========================================
+// ⚙️ Slot Override Model (Custom Time Slots)
+// ==========================================
+model SlotOverride {
+  id          String   @id @default(cuid())
+  date        DateTime @db.Date
+  startTime   String   @map("start_time")
+  endTime     String   @map("end_time")
+  isAvailable Boolean  @default(true) @map("is_available")
+  maxBookings Int?     @map("max_bookings")
+  reason      String?
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([date, startTime, endTime])
+  @@index([date])
+  @@map("slot_overrides")
+}
+
+// ==========================================
+// 📝 Notification Log Model
+// ==========================================
+model NotificationLog {
+  id        String   @id @default(cuid())
+  type      String   // LINE_MESSAGE | EMAIL
+  recipient String
+  content   String   @db.Text
+  status    String   @default("PENDING") // PENDING | SENT | FAILED
+  sentAt    DateTime? @map("sent_at")
+  error     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([type, status])
+  @@map("notification_logs")
+}
+
+// ==========================================
+// 🕒 Time Slot Model (เพิ่มส่วนนี้เข้าไป)
+// ==========================================
+model TimeSlot {
+  id           String   @id @default(cuid())
+  date         DateTime @db.Date
+  startTime    String   @map("start_time") // "08:00"
+  endTime      String   @map("end_time")   // "09:00"
+  maxBookings  Int      @default(1) @map("max_bookings")
+  bookedCount  Int      @default(0) @map("booked_count")
+  isAvailable  Boolean  @default(true) @map("is_available")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // ป้องกันการสร้างเวลาซ้ำในวันเดียวกัน
+  @@unique([date, startTime, endTime])
+  @@index([date])
+  @@map("time_slots")
+}

@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # เว็บแอปของเรา
+  app:
+    container_name: wellness-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      # ต่อ DB ผ่านชื่อ service "db"
+      - DATABASE_URL=mysql://user:password@db:3306/wellness_db
+    depends_on:
+      - db
+
+  # ฐานข้อมูล MySQL
+  db:
+    container_name: wellness-db
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: wellness_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3307:3306" # Forward port ออกมาที่ 3307 (กันชนกับเครื่องตัวเอง)
+    volumes:
+      - db_data:/var/lib/mysql
+
+  # ตัวจัดการฐานข้อมูล (Admin UI)
+  phpmyadmin:
+    container_name: wellness-admin
+    image: phpmyadmin/phpmyadmin
+    restart: always
+    environment:
+      PMA_HOST: db
+      PMA_USER: user
+      PMA_PASSWORD: password
+    ports:
+      - "8080:80"
+    depends_on:
+      - db
+
+volumes:
+  db_data:
