@@ -4,13 +4,40 @@
 
 import { Client, type TextMessage, type FlexMessage } from '@line/bot-sdk';
 
-// LINE Bot Client (Server-side only)
-const lineConfig = {
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET || '',
-};
+// LINE Bot Client (Lazy initialization to avoid build errors)
+let _lineClient: Client | null = null;
 
-export const lineClient = new Client(lineConfig);
+function getLineClient(): Client {
+  if (!_lineClient) {
+    const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const channelSecret = process.env.LINE_CHANNEL_SECRET;
+    
+    if (!channelAccessToken || !channelSecret) {
+      // Return a dummy client for build time
+      console.warn('[LINE] Missing credentials, using dummy client');
+      return {
+        pushMessage: async () => ({ sentMessages: [] }),
+        replyMessage: async () => ({ sentMessages: [] }),
+      } as unknown as Client;
+    }
+    
+    _lineClient = new Client({
+      channelAccessToken,
+      channelSecret,
+    });
+  }
+  return _lineClient;
+}
+
+// Export getter instead of direct client
+export const lineClient = {
+  pushMessage: async (...args: Parameters<Client['pushMessage']>) => {
+    return getLineClient().pushMessage(...args);
+  },
+  replyMessage: async (...args: Parameters<Client['replyMessage']>) => {
+    return getLineClient().replyMessage(...args);
+  },
+};
 
 // ----- Message Templates -----
 
